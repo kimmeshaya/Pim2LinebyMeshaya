@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#2563eb">
+<title>Patient Info → LINE</title>
+<style>
+:root{--bg:#f4f7fb;--card:#fff;--text:#172033;--muted:#667085;--border:#d9dee8;--blue:#2563eb}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+.wrap{max-width:720px;margin:auto;padding:14px 12px 36px}.card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:18px;box-shadow:0 7px 28px rgba(20,30,50,.07)}
+h1{margin:0 0 5px;font-size:23px}.sub{margin:0 0 19px;color:var(--muted);font-size:14px}
+label{display:block;font-weight:650;margin:14px 0 7px}input,textarea{width:100%;border:1px solid var(--border);border-radius:10px;padding:12px;font-size:16px;background:#fff;outline:none}input:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px #2563eb1a}textarea{min-height:76px;resize:vertical}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:11px}.choices{display:grid;grid-template-columns:1fr 1fr;gap:8px}.choice{position:relative;margin:0}.choice input{position:absolute;opacity:0;width:0}.choice span{display:block;border:1px solid var(--border);border-radius:10px;padding:11px;text-align:center;cursor:pointer}.choice input:checked+span{border-color:var(--blue);background:#eef4ff;color:#1747a6;font-weight:700}
+.hn{display:flex;align-items:center;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:#fff}.hn:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px #2563eb1a}.hn-prefix{padding-left:13px;color:var(--muted);font-weight:700}.hn input{border:0;box-shadow:none!important}
+.hidden{display:none}.actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:20px}button{border:0;border-radius:11px;padding:13px;font-size:16px;font-weight:750;cursor:pointer}.copy{background:var(--blue);color:#fff}.clear{background:#edf0f4;color:#253047}
+.preview{margin-top:18px}.preview textarea{min-height:245px;background:#f8fafc;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px}.status{height:21px;margin-top:8px;color:#176b3a;font-size:14px}.note{margin-top:14px;color:var(--muted);font-size:12px;line-height:1.5}
+@media(max-width:480px){.row{grid-template-columns:1fr}.card{padding:15px}h1{font-size:21px}}
+</style>
+</head>
+<body>
+<div class="wrap"><div class="card">
+<h1>Patient Info → LINE</h1>
+<p class="sub">กรอกข้อมูล แล้วกด Copy Text เพื่อส่งต่อใน LINE</p>
+
+<label>Patient</label>
+<div class="choices">
+<label class="choice"><input type="radio" name="sex" value="ญไทย" checked><span>ญไทย</span></label>
+<label class="choice"><input type="radio" name="sex" value="ชไทย"><span>ชไทย</span></label>
+<label class="choice"><input type="radio" name="sex" value="ญต่างชาติ"><span>ญต่างชาติ</span></label>
+<label class="choice"><input type="radio" name="sex" value="ชต่างชาติ"><span>ชต่างชาติ</span></label>
+</div>
+
+<div class="row">
+<div><label>Age</label><input id="age" inputmode="numeric" placeholder="เช่น 56"></div>
+<div><label>HN</label><div class="hn"><span class="hn-prefix">29-</span><input id="hn" inputmode="numeric" maxlength="8" placeholder="8 digits"></div></div>
+</div>
+
+<label>Order</label><input id="order" placeholder="เช่น CT Abdomen with contrast">
+<label>Chief complaint</label><textarea id="cc" placeholder="เช่น abdominal pain"></textarea>
+
+<label>Contrast</label>
+<div class="choices">
+<label class="choice"><input type="radio" name="contrast" value="Yes"><span>Yes</span></label>
+<label class="choice"><input type="radio" name="contrast" value="No" checked><span>No</span></label>
+</div>
+
+<div id="contrastBox" class="hidden">
+<label>Contrast type / name</label>
+<input id="contrastType" placeholder="เช่น Omnipaque 350">
+</div>
+
+<div class="row">
+<div><label>Lab Cr</label><input id="cr" inputmode="decimal" placeholder="เช่น 0.82"></div>
+<div><label>Lab GFR</label><input id="gfr" inputmode="decimal" placeholder="เช่น 91"></div>
+</div>
+
+<label>Previous study</label>
+<div class="choices">
+<label class="choice"><input type="radio" name="previous" value="Yes" checked><span>Yes</span></label>
+<label class="choice"><input type="radio" name="previous" value="No"><span>No</span></label>
+</div>
+
+<div class="actions">
+<button class="copy" id="copy">📋 Copy Text</button>
+<button class="clear" id="clear">↻ Clear</button>
+</div>
+
+<div class="preview">
+<label>Preview</label>
+<textarea id="out" readonly></textarea>
+<div class="status" id="status"></div>
+</div>
+
+<div class="note">
+This prototype does not send or save the entered patient information to a database.
+For real hospital use, deploy it through your hospital's approved IT/intranet environment and have the hospital review privacy/security requirements.
+</div>
+</div></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const val=id=>$(id).value.trim();
+const selected=name=>document.querySelector('input[name="'+name+'"]:checked')?.value||"";
+
+function update(){
+  const contrast=selected("contrast")==="Yes";
+  $("contrastBox").classList.toggle("hidden",!contrast);
+  const hnDigits=$("hn").value.replace(/\D/g,"").slice(0,8);
+  const hn="29-"+hnDigits;
+  $("out").value=
+`${selected("sex")}
+Age : ${val("age")}
+Order: ${val("order")}
+Chief complain : ${val("cc")}
+Contrast : ${contrast ? val("contrastType") : "No"}
+Lab Cr : ${val("cr")}
+Lab GFR : ${val("gfr")}
+Previous study: ${selected("previous")}
+
+HN: ${hn}
+ส่งประวัติให้ทางเมลล์เรียบร้อยค่ะ`;
+}
+
+document.querySelectorAll("input,textarea").forEach(e=>e.addEventListener("input",update));
+document.querySelectorAll('input[type="radio"]').forEach(e=>e.addEventListener("change",update));
+
+$("copy").addEventListener("click",async()=>{
+  update();
+  try{
+    await navigator.clipboard.writeText($("out").value);
+  }catch(e){
+    $("out").focus(); $("out").select(); document.execCommand("copy");
+  }
+  $("status").textContent="✓ คัดลอกแล้ว — Paste ลง LINE ได้เลย";
+  setTimeout(()=>$("status").textContent="",2500);
+});
+
+$("clear").addEventListener("click",()=>{
+  ["age","hn","order","cc","contrastType","cr","gfr"].forEach(id=>$(id).value="");
+  document.querySelector('input[name="sex"][value="ญไทย"]').checked=true;
+  document.querySelector('input[name="contrast"][value="No"]').checked=true;
+  document.querySelector('input[name="previous"][value="Yes"]').checked=true;
+  update();
+  $("status").textContent="ล้างข้อมูลแล้ว";
+  setTimeout(()=>$("status").textContent="",1500);
+});
+
+$("hn").addEventListener("input",()=>{
+  $("hn").value=$("hn").value.replace(/\D/g,"").slice(0,8);
+  update();
+});
+update();
+</script>
+</body>
+</html>
